@@ -27,6 +27,15 @@ int main( int argc, char **argv ) {
   // open the named file
   // TODO: open the named file
 
+  // open the named file
+  // TODO: open the named file
+
+  fd = open(filename, O_RDWR);
+  if (fd < 0) {
+    fprintf( stderr, "Error: file could not be opened" );
+    exit( 1 );
+  }
+
   // determine file size and number of elements
   unsigned long file_size, num_elements;
   // TODO: determine the file size and number of elements
@@ -34,6 +43,30 @@ int main( int argc, char **argv ) {
   // mmap the file data
   int64_t *arr;
   // TODO: mmap the file data
+  struct stat statbuf;
+  int rc = fstat( fd, &statbuf );
+  if ( rc != 0 ) {
+    // handle fstat error and exit
+    fprintf( stderr, "Error: fstat error" );
+    exit( 1 );
+  }
+  // statbuf.st_size indicates the number of bytes in the file
+  file_size = statbuf.st_size;
+  num_elements = file_size / sizeof(int64_t);
+
+  arr = mmap( NULL, file_size, PROT_READ | PROT_WRITE,
+              MAP_SHARED, fd, 0 );
+  close( fd ); // file can be closed now
+  if ( arr == MAP_FAILED ) {
+    // handle mmap error and exit
+    fprintf( stderr, "Error: map failed, mmap error" );
+    exit( 1 );
+  }
+// *arr now behaves like a standard array of int64_t.
+// Be careful though! Going off the end of the array will
+// silently extend the file, which can rapidly lead to
+// disk space depletion!
+
 
   // Sort the data!
   int success;
@@ -45,6 +78,7 @@ int main( int argc, char **argv ) {
 
   // Unmap the file data
   // TODO: unmap the file data
+  munmap( arr, file_size );
 
   return 0;
 }
@@ -159,6 +193,7 @@ unsigned long partition( int64_t *arr, unsigned long start, unsigned long end ) 
 int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold ) {
   assert( end >= start );
   unsigned long len = end - start;
+  unsigned long mid = partition( arr, start, end );;
 
   // Base case: if there are fewer than 2 elements to sort,
   // do nothing
@@ -170,10 +205,58 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
   if ( len <= par_threshold ) {
     qsort( arr + start, len, sizeof(int64_t), compare );
     return 1;
-  }
+  } else {
+    pid_t child_pid = fork();
+    if ( child_pid == 0 ) {
+      // executing in the child
+      // ...do work...
 
-  // Partition
-  unsigned long mid = partition( arr, start, end );
+      // Partition
+      Child left, right;
+      left = quicksort_subproc( arr, start, mid, par_threshold );
+      right = quicksort_subproc( arr, mid + 1, end, par_threshold );
+
+      quicksort_wait( &left );
+      quicksort_wait( &right );
+
+      int left_success, right_success;
+      left_success = quicksort_check_success( &left );
+      right_success = quicksort_check_success( &right );
+      if ( !(left_success && right_success) )
+        exit( 0 );
+      else
+        exit( 1 );
+    } else if ( child_pid < 0 ) {
+      fprintf( stderr, "Error: fork failed" );// fork failed
+      exit( 0 ); // ...handle error...
+    } else {
+      // in parent
+      int rc, wstatus;
+      rc = waitpid( child_pid, &wstatus, 0 );
+      if ( rc < 0 ) {
+        // waitpid failed
+        // ...handle error...
+        fprintf( stderr, "Error: parent does not successfully learn the result of the child" );
+        exit( 0 );
+      } else {
+        // check status of child
+        if ( !WIFEXITED( wstatus ) ) {
+          // child did not exit normally (e.g., it was terminated by a signal)
+          // ...handle child failure...
+          fprintf( stderr, "Error: child terminated by signal" );
+          exit( 0 );
+        } else if ( WEXITSTATUS( wstatus ) != 0 ) {
+          // child exited with a non-zero exit code
+          // ...handle child failure...
+          fprintf( stderr, "Error: child exited with non-zero exit code" );
+          exit( 0 );
+        } else {
+          // child exited with exit code zero (it was successful)
+          exit( 1 );
+        }
+      }
+    }
+  }
 
   // Recursively sort the left and right partitions
   int left_success, right_success;
@@ -185,3 +268,48 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
 }
 
 // TODO: define additional helper functions if needed
+Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
+    Child child;
+    child.pid = fork();
+    if (child.pid < 0) {
+      // Fork failed; report error.
+      fprintf( stderr, "Error: fork failed" );
+      child.exit = 0;
+      return child;
+    }
+    if (child.pid == 0) {
+      // Partition
+      unsigned long mid = partition( arr, start, end );
+
+      int left_success, right_success;
+      // Recursively sort the left and right partitions
+      left_success = quicksort( arr, start, mid, par_threshold );
+      right_success = quicksort( arr, mid + 1, end, par_threshold );
+      child.exit = left_success && right_success;
+    }
+    // initialize exit_status
+    child.exit = 0;
+    return child;
+}
+
+void quicksort_wait(Child *child) {
+  int rc, status;
+  rc = waitpid(child->pid, &status, 0);
+  if (child->pid > 0) {
+    if (rc < 0) {
+      fprintf( stderr, "Error: waitpid failed");
+      child->exit = 0;
+    } else {
+      if (WIFEXITED(status)) {
+        child->exit = 1;
+      } else {
+        // The child did not exit normally.
+        child->exit = 0;
+      }
+    }
+  }
+}
+
+int quicksort_check_success(Child *child) {
+  return (child->exit == 1);
+}

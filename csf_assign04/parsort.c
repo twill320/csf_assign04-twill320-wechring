@@ -234,7 +234,7 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
         exit( 1 );
     } else if ( child_pid < 0 ) {
       fprintf( stderr, "Error: fork failed" );// fork failed
-      exit( 0 ); // ...handle error...
+      exit( 1 ); // ...handle error...
     } else {
       // in parent
       int rc, wstatus;
@@ -250,15 +250,16 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
           // child did not exit normally (e.g., it was terminated by a signal)
           // ...handle child failure...
           fprintf( stderr, "Error: child terminated by signal" );
-          exit( 0 );
+          exit( 1 );
         } else if ( WEXITSTATUS( wstatus ) != 0 ) {
           // child exited with a non-zero exit code
           // ...handle child failure...
           fprintf( stderr, "Error: child exited with non-zero exit code" );
-          exit( 0 );
+          exit( 1 );
         } else {
           // child exited with exit code zero (it was successful)
-          exit( 1 );
+          fprintf( stdout, "Success: child execution successful" );
+          exit( 0 );
         }
       }
     }

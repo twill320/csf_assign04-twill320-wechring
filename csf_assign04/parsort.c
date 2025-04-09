@@ -36,9 +36,6 @@ int main( int argc, char **argv ) {
   // open the named file
   // TODO: open the named file
 
-  // open the named file
-  // TODO: open the named file
-
   fd = open(filename, O_RDWR);
   if (fd < 0) {
     fprintf( stderr, "Error: file could not be opened" );

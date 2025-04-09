@@ -222,16 +222,20 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
       left = quicksort_subproc( arr, start, mid, par_threshold );
       right = quicksort_subproc( arr, mid + 1, end, par_threshold );
 
+      // parent waits
       quicksort_wait( &left );
       quicksort_wait( &right );
 
+      // children are recursively sorted
       int left_success, right_success;
       left_success = quicksort_check_success( &left );
       right_success = quicksort_check_success( &right );
-      if ( !(left_success && right_success) )
+
+      if ( left_success && right_success ) {
         exit( 0 );
-      else
+      } else {
         exit( 1 );
+      }
     } else if ( child_pid < 0 ) {
       fprintf( stderr, "Error: fork failed" );// fork failed
       exit( 1 ); // ...handle error...
@@ -265,6 +269,9 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
     }
   }
 
+  // wondering if this part is necessary, mentions modification for child processes,
+  // which we handle above, and potentially changes values of left_success and right_success 
+  // to give incorect solution
   // Recursively sort the left and right partitions
   int left_success, right_success;
   // TODO: modify this code so that the recursive calls execute in child processes

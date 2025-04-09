@@ -14,6 +14,14 @@ unsigned long partition( int64_t *arr, unsigned long start, unsigned long end );
 int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold );
 
 // TODO: declare additional helper functions if needed
+typedef struct {
+  pid_t pid;       // Process ID of the child
+  int exit; // Exit status from waitpid
+} Child;
+
+Child quicksort_subproc( int64_t *arr, unsigned long start, unsigned long mid, unsigned long par_threshold );
+int quicksort_check_success( Child *child);
+void quicksort_wait( Child *child );
 
 int main( int argc, char **argv ) {
   unsigned long par_threshold;
@@ -23,6 +31,7 @@ int main( int argc, char **argv ) {
   }
 
   int fd;
+  char *filename = argv[1];
 
   // open the named file
   // TODO: open the named file

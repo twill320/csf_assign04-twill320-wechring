@@ -31,7 +31,7 @@ int main( int argc, char **argv ) {
   }
 
   int fd;
-  char *filename = argv[1];
+  const char *filename = argv[1];
 
   // open the named file
   // TODO: open the named file
@@ -54,11 +54,18 @@ int main( int argc, char **argv ) {
   if ( rc != 0 ) {
     // handle fstat error and exit
     fprintf( stderr, "Error: fstat error" );
+    close(fd);
     exit( 1 );
   }
   // statbuf.st_size indicates the number of bytes in the file
   file_size = statbuf.st_size;
   num_elements = file_size / sizeof(int64_t);
+
+  if (file_size % sizeof(int64_t) != 0) {
+    fprintf(stderr, "Error: file size is not a multiple of int64_t");
+    close(fd);
+    exit(1);
+  }
 
   arr = mmap( NULL, file_size, PROT_READ | PROT_WRITE,
               MAP_SHARED, fd, 0 );
@@ -84,7 +91,10 @@ int main( int argc, char **argv ) {
 
   // Unmap the file data
   // TODO: unmap the file data
-  munmap( arr, file_size );
+  if (munmap(arr, file_size) != 0) {
+    perror("Error unmapping file");
+    exit(1);
+}
 
   return 0;
 }
@@ -199,7 +209,6 @@ unsigned long partition( int64_t *arr, unsigned long start, unsigned long end ) 
 int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold ) {
   assert( end >= start );
   unsigned long len = end - start;
-  unsigned long mid = partition( arr, start, end );;
 
   // Base case: if there are fewer than 2 elements to sort,
   // do nothing
@@ -211,119 +220,119 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
   if ( len <= par_threshold ) {
     qsort( arr + start, len, sizeof(int64_t), compare );
     return 1;
-  } else {
-    pid_t child_pid = fork();
-    if ( child_pid == 0 ) {
-      // executing in the child
-      // ...do work...
+  }
 
-      // Partition
-      Child left, right;
-      left = quicksort_subproc( arr, start, mid, par_threshold );
-      right = quicksort_subproc( arr, mid + 1, end, par_threshold );
+  unsigned long mid = partition( arr, start, end );
 
-      // parent waits
-      quicksort_wait( &left );
-      quicksort_wait( &right );
+  pid_t child_pid = fork();
+  if ( child_pid == 0 ) {
+    // executing in the child
+    // ...do work...
 
-      // children are recursively sorted
-      int left_success, right_success;
-      left_success = quicksort_check_success( &left );
-      right_success = quicksort_check_success( &right );
+    // Partition
+    Child left, right;
+    left = quicksort_subproc( arr, start, mid, par_threshold );
+    right = quicksort_subproc( arr, mid, end, par_threshold );
 
-      if ( left_success && right_success ) {
-        exit( 0 );
-      } else {
-        exit( 1 );
-      }
-    } else if ( child_pid < 0 ) {
-      fprintf( stderr, "Error: fork failed" );// fork failed
-      exit( 1 ); // ...handle error...
+    // parent waits
+    quicksort_wait( &left );
+    quicksort_wait( &right );
+
+    // children are recursively sorted
+    int left_success, right_success;
+    left_success = quicksort_check_success( &left );
+    right_success = quicksort_check_success( &right );
+
+    if ( left_success && right_success ) {
+      exit( 0 );
     } else {
-      // in parent
-      int rc, wstatus;
-      rc = waitpid( child_pid, &wstatus, 0 );
-      if ( rc < 0 ) {
-        // waitpid failed
-        // ...handle error...
-        fprintf( stderr, "Error: parent does not successfully learn the result of the child" );
-        exit( 0 );
+      exit( 1 );
+    }
+  } else if ( child_pid < 0 ) {
+    fprintf( stderr, "Error: fork failed" );// fork failed
+    return 0; // ...handle error...
+  } else {
+
+    // in parent
+    int rc, wstatus;
+    rc = waitpid( child_pid, &wstatus, 0 );
+
+    if ( rc < 0 ) {
+      // waitpid failed
+      // ...handle error...
+      fprintf( stderr, "Error: parent does not successfully learn the result of the child" );
+      return( 0 );
+    } else {
+      // check status of child
+      if (rc < 0) {
+          fprintf(stderr, "Error: waitpid failed\n");
+          return 0;
+      }
+
+      if (!WIFEXITED( wstatus ) ) {
+        // child did not exit normally (e.g., it was terminated by a signal)
+        // ...handle child failure...
+        fprintf( stderr, "Error: child terminated by signal" );
+        return 0;
+      } else if (WEXITSTATUS( wstatus ) != 0 ) {
+        // child exited with a non-zero exit code
+        // ...handle child failure...
+        fprintf( stderr, "Error: child exited with non-zero exit code" );
+        return 0;
       } else {
-        // check status of child
-        if ( !WIFEXITED( wstatus ) ) {
-          // child did not exit normally (e.g., it was terminated by a signal)
-          // ...handle child failure...
-          fprintf( stderr, "Error: child terminated by signal" );
-          exit( 1 );
-        } else if ( WEXITSTATUS( wstatus ) != 0 ) {
-          // child exited with a non-zero exit code
-          // ...handle child failure...
-          fprintf( stderr, "Error: child exited with non-zero exit code" );
-          exit( 1 );
-        } else {
-          // child exited with exit code zero (it was successful)
-          fprintf( stdout, "Success: child execution successful" );
-          exit( 0 );
-        }
+        // child exited with exit code zero (it was successful)
+        //fprintf( stdout, "Success: child execution successful" );
+        return 1;
       }
     }
   }
 
-  // wondering if this part is necessary, mentions modification for child processes,
-  // which we handle above, and potentially changes values of left_success and right_success 
-  // to give incorect solution
-  // Recursively sort the left and right partitions
-  int left_success, right_success;
-  // TODO: modify this code so that the recursive calls execute in child processes
-  left_success = quicksort( arr, start, mid, par_threshold );
-  right_success = quicksort( arr, mid + 1, end, par_threshold );
-
-  return left_success && right_success;
 }
 
 // TODO: define additional helper functions if needed
 Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
     Child child;
     child.pid = fork();
+
     if (child.pid < 0) {
       // Fork failed; report error.
       fprintf( stderr, "Error: fork failed" );
-      child.exit = 0;
+      child.exit = -1;
       return child;
     }
+
     if (child.pid == 0) {
       // Partition
-      unsigned long mid = partition( arr, start, end );
-
-      int left_success, right_success;
-      // Recursively sort the left and right partitions
-      left_success = quicksort( arr, start, mid, par_threshold );
-      right_success = quicksort( arr, mid + 1, end, par_threshold );
-      child.exit = left_success && right_success;
+      int success = quicksort(arr, start, end, par_threshold);
+      if (success) {
+        exit(0);
+      } else {
+        exit(1);
+      }
     }
-    // initialize exit_status
-    child.exit = 0;
+    child.exit = -1;
     return child;
 }
 
 void quicksort_wait(Child *child) {
   int rc, status;
   rc = waitpid(child->pid, &status, 0);
-  if (child->pid > 0) {
+
     if (rc < 0) {
       fprintf( stderr, "Error: waitpid failed");
-      child->exit = 0;
+      child->exit = -1;
     } else {
       if (WIFEXITED(status)) {
-        child->exit = 1;
+        child->exit = WEXITSTATUS(status);
       } else {
         // The child did not exit normally.
-        child->exit = 0;
+        child->exit = -1;
       }
     }
-  }
+
 }
 
 int quicksort_check_success(Child *child) {
-  return (child->exit == 1);
+  return (child->exit == 0);
 }
+

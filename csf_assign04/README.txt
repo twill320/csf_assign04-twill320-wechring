@@ -1,9 +1,6 @@
-Command to update Assignment_4.zip contents:
-zip -9r Assignment_4.zip parsort.c Makefile README.txt
-
 CONTRIBUTIONS
-Toluwani Williams
-Wech Ring
+Toluwani Williams - implementation of parallel sorting of child processes, file handling, experimentation
+Wech Ring - implementation of parallel sorting of child processes, file handling, experimentation
 
 REPORT:
 Test run with threshold 2097152

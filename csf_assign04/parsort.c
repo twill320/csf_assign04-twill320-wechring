@@ -300,6 +300,7 @@ Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, un
       left_success = quicksort( arr, start, mid, par_threshold );
       right_success = quicksort( arr, mid + 1, end, par_threshold );
       child.exit = left_success && right_success;
+      return child;
     }
     // initialize exit_status
     child.exit = 0;

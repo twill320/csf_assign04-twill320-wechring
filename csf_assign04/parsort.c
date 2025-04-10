@@ -232,7 +232,7 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
     // Partition
     Child left, right;
     left = quicksort_subproc( arr, start, mid, par_threshold );
-    right = quicksort_subproc( arr, mid, end, par_threshold );
+    right = quicksort_subproc( arr, mid+1, end, par_threshold );
 
     // parent waits
     quicksort_wait( &left );

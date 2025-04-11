@@ -1,6 +1,8 @@
 #include <sstream>
 #include <cctype>
 #include <cassert>
+#include <bits/stdc++.h>
+#include <cstring>
 #include "csapp.h"
 #include "message.h"
 #include "connection.h"
@@ -20,7 +22,12 @@ Connection::Connection(int fd)
 void Connection::connect(const std::string &hostname, int port) {
   // TODO: call open_clientfd to connect to the server
   // TODO: call rio_readinitb to initialize the rio_t object
-  m_fd = open_clientfd(hostname, port);
+  char usable_hostname[hostname.length()];
+  strcpy(usable_hostname, hostname.c_str());
+
+  std::string str = std::to_string(port);
+  const char* char_port = str.c_str();
+  m_fd = open_clientfd(usable_hostname, char_port);
   rio_readinitb(&m_fdbuf, port);
 }
 
@@ -48,20 +55,25 @@ bool Connection::send(const Message &msg) {
   // TODO: send a message
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
-  unsigned msg_len = strlen(msg->data);
-  std::string *temp_string *msg->tag + *msg->data;
+  unsigned msg_len = msg.data.length();
+  std::string temp_string = msg.tag + ":" + msg.data;
+
+  const char* char_str = temp_string.c_str();
+
+  // Cast the const char* to const void*
+  const void* void_str = static_cast<const void*>(char_str);
 
   // msg length greater than max length
-  if (msg_len > msg->MAX_LEN) {
+  if (msg_len > msg.MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
   }
 
-  rio_writen(m_fd, temp_string, strlen(temp_string));
-  rio_writen(fd, "\n", 1);
+  rio_writen(m_fd, void_str, temp_string.length());
+  rio_writen(m_fd, "\n", 1);
   m_last_result = SUCCESS;
 
-  return true
+  return true;
 }
 
 bool Connection::receive(Message &msg) {
@@ -69,24 +81,24 @@ bool Connection::receive(Message &msg) {
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
 
-  unsigned msg_len = strlen(msg->data);
-  std::string *temp_string *msg->tag + *msg->data;
+  unsigned msg_len = msg.data.length();
 
   // msg length greater than max length
-  if (msg_len > msg->MAX_LEN) {
+  if (msg_len > msg.MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
   }
 
-  char buf[msg->MAX_LEN];
+  char buf[msg.MAX_LEN];
   rio_readinitb(&m_fdbuf, m_fd);
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
-  vector<std::string> msg_line;
-  getline(buf, msg_line, ': ');
+  char *msg_line;
+  const char delimiter[] = ":";
+  msg_line = strtok(buf, delimiter);
 
-  *msg->tag = msg_line[0];
-  *msg->data = msg_line[1];
+  msg.tag = msg_line[0];
+  msg.data = msg_line[1];
 
   if (n > 0) {
     m_last_result = SUCCESS;

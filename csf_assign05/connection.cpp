@@ -69,6 +69,7 @@ bool Connection::send(const Message &msg) {
     return false;
   }
 
+  // write message to server
   rio_writen(m_fd, void_str, temp_string.length());
   rio_writen(m_fd, "\n", 1);
   m_last_result = SUCCESS;
@@ -89,10 +90,12 @@ bool Connection::receive(Message &msg) {
     return false;
   }
 
+  // read message from server
   char buf[msg.MAX_LEN];
   rio_readinitb(&m_fdbuf, m_fd);
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
+  // separate message into tag and data
   char *msg_line;
   const char delimiter[] = ":";
   msg_line = strtok(buf, delimiter);
@@ -100,6 +103,7 @@ bool Connection::receive(Message &msg) {
   msg.tag = msg_line[0];
   msg.data = msg_line[1];
 
+  // check that message was received
   if (n > 0) {
     m_last_result = SUCCESS;
     return true;

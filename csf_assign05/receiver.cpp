@@ -26,25 +26,25 @@ int main(int argc, char **argv) {
 
   // TODO: send rlogin and join messages (expect a response from
   //       the server for each one)
-  std::string *tag = "rlogin";
-  Message *msg = {tag, &username};
+  Message msg("rlogin", username);
+
   conn.send(msg);
   conn.receive(msg);
 
-  if (*msg->tag == TAG_ERR) {
+  if (msg.tag == TAG_ERR) {
     fprintf( stderr, "Error: could not register as specific user for receiving" );
-    *msg->tag = "quit";
+    msg.tag = "quit";
     exit( 1 );
   }
 
-  *msg->tag = "join";
-  msg->data = &room_name;
+  msg.tag = "join";
+  msg.data = room_name;
   conn.send(msg);
   conn.receive(msg);
 
-  if (*msg->tag == TAG_ERR) {
+  if (msg.tag == TAG_ERR) {
     fprintf( stderr, "Error: could not register as specific user for receiving" );
-    *msg->tag = "quit";
+    msg.tag = "quit";
     exit( 1 );
   }
 
@@ -53,7 +53,8 @@ int main(int argc, char **argv) {
   std::vector<std::string> data_vector;
   std::string data;
 
-  while (*msg->tag == TAG_DELIVERY && getline(*msg->data, data, ':')) { // trying to get room, sender, and messsage info from data
+  std::istringstream iss(msg.data);
+  while (msg.tag == TAG_DELIVERY && getline(iss, data, ':')) { // trying to get room, sender, and messsage info from data
     data_vector.push_back(data);
     // probably save room, sender, message info here
     // work with info here to print information
@@ -61,6 +62,7 @@ int main(int argc, char **argv) {
     // wait here
     // maybe use helper function similar to quicksort_wait
     conn.receive(msg);
+    std::istringstream iss(msg.data);
   }
 
 

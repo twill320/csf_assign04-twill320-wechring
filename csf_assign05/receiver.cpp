@@ -50,6 +50,8 @@ int main(int argc, char **argv) {
 
   // TODO: loop waiting for messages from server
   //       (which should be tagged with TAG_DELIVERY)
+  
+  // still have to work on this part for reading delivered messages
   std::vector<std::string> data_vector;
   std::string data;
 

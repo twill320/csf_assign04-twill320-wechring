@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -21,12 +22,46 @@ int main(int argc, char **argv) {
   Connection conn;
 
   // TODO: connect to server
+  conn.connect(server_hostname, server_port);
 
   // TODO: send rlogin and join messages (expect a response from
   //       the server for each one)
+  std::string *tag = "rlogin";
+  Message *msg = {tag, &username};
+  conn.send(msg);
+  conn.receive(msg);
+
+  if (*msg->tag == TAG_ERR) {
+    fprintf( stderr, "Error: could not register as specific user for receiving" );
+    *msg->tag = "quit";
+    exit( 1 );
+  }
+
+  *msg->tag = "join";
+  msg->data = &room_name;
+  conn.send(msg);
+  conn.receive(msg);
+
+  if (*msg->tag == TAG_ERR) {
+    fprintf( stderr, "Error: could not register as specific user for receiving" );
+    *msg->tag = "quit";
+    exit( 1 );
+  }
 
   // TODO: loop waiting for messages from server
   //       (which should be tagged with TAG_DELIVERY)
+  std::vector<std::string> data_vector;
+  std::string data;
+
+  while (*msg->tag == TAG_DELIVERY && getline(*msg->data, data, ':')) { // trying to get room, sender, and messsage info from data
+    data_vector.push_back(data);
+    // probably save room, sender, message info here
+    // work with info here to print information
+    data_vector.clear();
+    // wait here
+    // maybe use helper function similar to quicksort_wait
+    conn.receive(msg);
+  }
 
 
   return 0;

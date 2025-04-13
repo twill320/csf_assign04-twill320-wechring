@@ -95,7 +95,12 @@ bool Connection::receive(Message &msg) {
   rio_readinitb(&m_fdbuf, m_fd);
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
-  // thinking of looping through buffer to get rid of newline
+  // trying to loop through buffer to get rid of newline
+  for (int i = 0; i < msg.MAX_LEN; i++) {
+    if (buff[i] == '\n') {
+      buff[i] = '\0';
+    }
+  }
 
   // separate message into tag and data
   char *msg_line;

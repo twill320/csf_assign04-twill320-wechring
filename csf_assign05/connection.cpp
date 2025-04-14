@@ -97,8 +97,8 @@ bool Connection::receive(Message &msg) {
 
   // trying to loop through buffer to get rid of newline
   for (int i = 0; i < msg.MAX_LEN; i++) {
-    if (buff[i] == '\n') {
-      buff[i] = '\0';
+    if (buf[i] == '\n') {
+      buf[i] = '\0';
     }
   }
 

@@ -24,16 +24,20 @@ int main(int argc, char **argv) {
   // TODO: connect to server
   conn.connect(server_hostname, server_port);
 
+  // connection error handling
+  if (!conn.is_open()) {
+    fprintf( stderr, "Error: couldn't connect to server" );
+    exit( 1 );
+  }
+
   // TODO: send rlogin and join messages (expect a response from
   //       the server for each one)
   Message msg("rlogin", username);
-
   conn.send(msg);
   conn.receive(msg);
 
-  if (msg.tag == TAG_ERR) {
-    fprintf( stderr, "Error: could not register as specific user for receiving" );
-    msg.tag = "quit";
+  if (msg.tag == "err") {
+    fprintf( stderr, msg.data.c_str() );
     exit( 1 );
   }
 
@@ -42,10 +46,8 @@ int main(int argc, char **argv) {
   conn.send(msg);
   conn.receive(msg);
 
-  if (msg.tag == TAG_ERR) {
-    fprintf( stderr, "Error: could not register as specific user for receiving" );
-    msg.tag = "quit";
-    exit( 1 );
+  if (msg.tag == "err") {
+    fprintf( stderr, msg.data.c_str() );
   }
 
   // TODO: loop waiting for messages from server
@@ -60,6 +62,7 @@ int main(int argc, char **argv) {
     data_vector.push_back(data);
     // probably save room, sender, message info here
     // work with info here to print information
+
     data_vector.clear();
     // wait here
     // maybe use helper function similar to quicksort_wait

@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
   //       the server for each one)
   Message msg("rlogin", username);
   conn.send(msg);
-  conn.receive(msg);
 
+  conn.receive(msg);
   if (msg.tag == "err") {
     fprintf( stderr, msg.data.c_str() );
     exit( 1 );

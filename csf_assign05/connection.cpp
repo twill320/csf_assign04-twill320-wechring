@@ -56,12 +56,12 @@ bool Connection::send(const Message &msg) {
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
   unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
-  std::string temp_string = msg.tag + ":" + msg.data + "\n";
+  std::string* msg_str = msg.make_msg_str();
 
-  const char* char_str = temp_string.c_str();
+  //const char* char_str = temp_string.c_str();
 
   // Cast the const char* to const void*
-  const void* void_str = static_cast<const void*>(char_str);
+  //const void* void_str = static_cast<const void*>(char_str);
 
   // msg length greater than max length
   if (msg_len > msg.MAX_LEN) {
@@ -70,7 +70,7 @@ bool Connection::send(const Message &msg) {
   }
 
   // write message to server
-  ssize_t nw = rio_writen(m_fd, void_str, temp_string.length());
+  ssize_t nw = rio_writen(m_fd, msg_str, msg_str->length());
   if (nw == -1) {
     m_last_result = EOF_OR_ERROR;
     return false;
@@ -94,7 +94,6 @@ bool Connection::receive(Message &msg) {
   // trying to loop through buffer to get rid of newline
   if (buf[n - 1] == '\n') {
     buf[n - 1] = '\0';
-    --n;
   }
 
   // separate message into tag and data

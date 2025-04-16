@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 
   // TODO: send rlogin and join messages (expect a response from
   //       the server for each one)
-  Message msg("rlogin", username);
+  Message msg(TAG_RLOGIN, username);
   conn.send(msg);
 
   conn.receive(msg);
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     exit( 1 );
   }
 
-  msg.tag = "join";
+  msg.tag = TAG_JOIN;
   msg.data = room_name;
   conn.send(msg);
 

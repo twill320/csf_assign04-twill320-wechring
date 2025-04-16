@@ -55,8 +55,8 @@ bool Connection::send(const Message &msg) {
   // TODO: send a message
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
-  unsigned msg_len = msg.data.length();
-  std::string temp_string = msg.tag + ":" + msg.data;
+  unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
+  std::string temp_string = msg.tag + ":" + msg.data + "\n";
 
   const char* char_str = temp_string.c_str();
 
@@ -70,8 +70,12 @@ bool Connection::send(const Message &msg) {
   }
 
   // write message to server
-  rio_writen(m_fd, void_str, temp_string.length());
-  rio_writen(m_fd, "\n", 1);
+  ssize_t nw = rio_writen(m_fd, void_str, temp_string.length());
+  if (nw == -1) {
+    m_last_result = EOF_OR_ERROR;
+    return false;
+  }
+
   m_last_result = SUCCESS;
 
   return true;
@@ -82,33 +86,36 @@ bool Connection::receive(Message &msg) {
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
 
-  unsigned msg_len = msg.data.length();
-
-  // msg length greater than max length
-  if (msg_len > msg.MAX_LEN) {
-    m_last_result = INVALID_MSG;
-    return false;
-  }
-
   // read message from server
   char buf[msg.MAX_LEN];
   rio_readinitb(&m_fdbuf, m_fd);
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
   // trying to loop through buffer to get rid of newline
-  for (int i = 0; i < msg.MAX_LEN; i++) {
-    if (buf[i] == '\n') {
-      buf[i] = '\0';
-    }
+  if (buf[n - 1] == '\n') {
+    buf[n - 1] = '\0';
+    --n;
   }
 
   // separate message into tag and data
-  char *msg_line;
-  const char delimiter[] = ":";
-  msg_line = strtok(buf, delimiter);
+  // buf already contains "<tag>:<data>\0"
+  char *colon = strchr(buf, ':');        // find first ':' in the buffer
 
-  msg.tag = msg_line[0];
-  msg.data = msg_line[1];
+  *colon = '\0';                         // overwrite ':' with NUL → two C‑strings
+  const char *tag_cstr  = buf;           // part before ':'
+  const char *data_cstr = colon + 1;     // part after ':'
+
+  // copy into std::string members
+  msg.tag  = tag_cstr;
+  msg.data = data_cstr;
+
+  unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
+
+  // msg length greater than max length
+  if (msg_len > msg.MAX_LEN) {
+    m_last_result = INVALID_MSG;
+    return false;
+  }
 
   // check that message was received
   if (n > 0) {

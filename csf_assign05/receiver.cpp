@@ -43,11 +43,9 @@ int main(int argc, char **argv) {
     exit( 1 );
   }
 
-  if (msg.tag == TAG_OK) {
-    msg.tag = "join";
-    msg.data = room_name;
-    conn.send(msg);
-  }
+  msg.tag = "join";
+  msg.data = room_name;
+  conn.send(msg);
 
   conn.receive(msg);
   if (msg.tag == TAG_ERR) {

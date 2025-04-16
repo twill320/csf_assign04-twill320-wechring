@@ -36,18 +36,25 @@ int main(int argc, char **argv) {
   conn.send(msg);
 
   conn.receive(msg);
-  if (msg.tag == "err") {
+  if (msg.tag == TAG_ERR) {
     fprintf( stderr, msg.data.c_str() );
+    msg.tag = TAG_QUIT;
+    conn.send(msg);
     exit( 1 );
   }
 
-  msg.tag = "join";
-  msg.data = room_name;
-  conn.send(msg);
-  conn.receive(msg);
+  if (msg.tag == TAG_OK) {
+    msg.tag = "join";
+    msg.data = room_name;
+    conn.send(msg);
+  }
 
-  if (msg.tag == "err") {
+  conn.receive(msg);
+  if (msg.tag == TAG_ERR) {
     fprintf( stderr, msg.data.c_str() );
+    msg.tag = TAG_QUIT;
+    conn.send(msg);
+    exit( 1 );
   }
 
   // TODO: loop waiting for messages from server

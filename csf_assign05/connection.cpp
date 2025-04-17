@@ -56,7 +56,7 @@ bool Connection::send(const Message &msg) {
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
   unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
-  std::string* msg_str = msg.make_msg_str();
+  std::string msg_str = msg.make_msg_str();
 
   //const char* char_str = temp_string.c_str();
 
@@ -70,7 +70,7 @@ bool Connection::send(const Message &msg) {
   }
 
   // write message to server
-  ssize_t nw = rio_writen(m_fd, msg_str, msg_str->length());
+  ssize_t nw = rio_writen(m_fd, &msg_str[0], msg_str.length());
   if (nw == -1) {
     m_last_result = EOF_OR_ERROR;
     return false;
@@ -88,30 +88,14 @@ bool Connection::receive(Message &msg) {
 
   // read message from server
   std::string buf;
+  buf.resize(msg.MAX_LEN + 2);
   rio_readinitb(&m_fdbuf, m_fd);
-  ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
+  ssize_t n = rio_readlineb(&m_fdbuf, &buf[0], buf.size());
 
-  // trying to loop through buffer to get rid of newline
-  if (buf[n - 1] == '\n') {
-    buf[n - 1] = '\0';
-  }
-
-  // separate message into tag and data
-  // buf already contains "<tag>:<data>\0"
-  char *colon = strchr(buf, ':');        // find first ':' in the buffer
-
-  *colon = '\0';                         // overwrite ':' with NUL → two C‑strings
-  const char *tag_cstr  = buf;           // part before ':'
-  const char *data_cstr = colon + 1;     // part after ':'
-
-  // copy into std::string members
-  msg.tag  = tag_cstr;
-  msg.data = data_cstr;
-
-  unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
+  msg.get_msg_comps(buf);
 
   // msg length greater than max length
-  if (msg_len > msg.MAX_LEN) {
+  if (buf.size() > msg.MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
   }

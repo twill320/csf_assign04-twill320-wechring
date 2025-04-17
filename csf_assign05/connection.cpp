@@ -93,7 +93,7 @@ bool Connection::receive(Message &msg) {
     return false;
   }
 
-  int i = 0;
+  size_t i = 0;
   while (buf[i] != ':' && i < sizeof(buf)) {
     tag += buf[i];
     i++;
@@ -104,6 +104,9 @@ bool Connection::receive(Message &msg) {
     data += buf[i];
     i++;
   }
+
+  msg.tag = tag;
+  msg.data = data;
 
   // check that message was received
   if (n > 0) {

@@ -87,7 +87,7 @@ bool Connection::receive(Message &msg) {
   // make sure that m_last_result is set appropriately
 
   // read message from server
-  char buf[msg.MAX_LEN];
+  std::string buf;
   rio_readinitb(&m_fdbuf, m_fd);
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 

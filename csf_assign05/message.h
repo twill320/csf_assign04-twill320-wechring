@@ -20,24 +20,6 @@ struct Message {
     : tag(tag), data(data) { }
 
   // TODO: you could add helper functions
-
-  // to be used in send in connection.cpp
-  std::string make_msg_str() const {
-    std::string msg_str;
-    msg_str = tag + ":" + data + "\n";
-    return msg_str;
-  }
-
-  // to be used in receive in connection.cpp
-  void get_msg_comps(std::string buf) {
-    size_t delim_ind = buf.find(':');
-
-    if (!buf.empty() && buf.back() == '\n') buf.pop_back();
-    if (!buf.empty() && buf.back() == '\r') buf.pop_back();
-
-    tag = buf.substr(0, delim_ind);
-    data = buf.substr(delim_ind + 1);
-  }
 };
 
 // standard message tags (note that you don't need to worry about

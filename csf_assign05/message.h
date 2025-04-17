@@ -22,9 +22,9 @@ struct Message {
   // TODO: you could add helper functions
 
   // to be used in send in connection.cpp
-  std::string* make_msg_str() const {
-    std::string* msg_str;
-    *msg_str = tag + ":" + data + "\n";
+  std::string make_msg_str() const {
+    std::string msg_str;
+    msg_str = tag + ":" + data + "\n";
     return msg_str;
   }
 

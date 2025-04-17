@@ -55,22 +55,16 @@ bool Connection::send(const Message &msg) {
   // TODO: send a message
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
-  unsigned msg_len = msg.data.length() + 1 + msg.tag.length();
-  std::string msg_str = msg.make_msg_str();
-
-  //const char* char_str = temp_string.c_str();
-
-  // Cast the const char* to const void*
-  //const void* void_str = static_cast<const void*>(char_str);
+  std::string msg_str = msg.tag + ':' + msg.data + '\n';
 
   // msg length greater than max length
-  if (msg_len > msg.MAX_LEN) {
+  if (msg_str.size() > msg.MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
   }
 
   // write message to server
-  ssize_t nw = rio_writen(m_fd, &msg_str[0], msg_str.length());
+  ssize_t nw = rio_writen(m_fd, &msg_str[0], msg_str.size());
   if (nw == -1) {
     m_last_result = EOF_OR_ERROR;
     return false;
@@ -87,17 +81,28 @@ bool Connection::receive(Message &msg) {
   // make sure that m_last_result is set appropriately
 
   // read message from server
-  std::string buf;
-  buf.resize(msg.MAX_LEN + 2);
+  std::string tag;
+  std::string data;
   rio_readinitb(&m_fdbuf, m_fd);
-  ssize_t n = rio_readlineb(&m_fdbuf, &buf[0], buf.size());
-
-  msg.get_msg_comps(buf);
+  char buf[msg.MAX_LEN];
+  ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
   // msg length greater than max length
-  if (buf.size() > msg.MAX_LEN) {
+  if (n > msg.MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
+  }
+
+  int i = 0;
+  while (buf[i] != ':' && i < sizeof(buf)) {
+    tag += buf[i];
+    i++;
+  }
+  i++;
+
+  while (buf[i] != '\r' && buf[i] != '\n' && i < sizeof(buf)) {
+    data += buf[i];
+    i++;
   }
 
   // check that message was received

@@ -82,10 +82,10 @@ bool Connection::receive(Message &msg) {
   // return true if successful, false if not
   // make sure that m_last_result is set appropriately
 
-  // read message from server
+  // initialize local tag and data variables
   std::string tag;
   std::string data;
-  //rio_readinitb(&m_fdbuf, m_fd);
+  // read message from server
   char buf[Message::MAX_LEN + 2];
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
@@ -95,6 +95,7 @@ bool Connection::receive(Message &msg) {
     return false;
   }
 
+  // loop through buffer to get msg tag
   size_t i = 0;
   while (i < sizeof(buf) && buf[i] != ':') {
     tag += buf[i];
@@ -102,11 +103,13 @@ bool Connection::receive(Message &msg) {
   }
   i++;
 
+  // loop through buffer to get msg data
   while (i < sizeof(buf) && buf[i] != '\r' && buf[i] != '\n') {
     data += buf[i];
     i++;
   }
 
+  // set msg tag and data
   msg.tag = tag;
   msg.data = data;
 

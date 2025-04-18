@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
   msg.tag = TAG_JOIN;
   msg.data = room_name;
   msg_sent = conn.send(msg);
-  if (!msg_sent) {
+  if (!msg_sent) { // check that join request was sent
     std::cerr << "Error: Failed to send join message." << std::endl;
     conn.close();
     return 1;
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
 
   Message join_response;
   msg_received = conn.receive(join_response);
-  if (!msg_received) {
+  if (!msg_received) { // check that join response was received
     std::cerr << "Error: No response for join." << std::endl;
     conn.close();
     return 1;
@@ -88,27 +88,31 @@ int main(int argc, char **argv) {
       std::string sender;
       std::string message;
 
+      // loop through received msg data to get room
       while (msg.data[i] != ':') {
         room += msg.data[i];
         i++;
       }
       i++;
 
+      // loop through received msg data to get sender
       while (msg.data[i] != ':') {
         sender += msg.data[i];
         i++;
       }
       i++;
 
+      // loop through received msg data to get actual message
       while (i < msg.data.size()) {
         message += msg.data[i];
         i++;
       }
 
+      // print message from sender
       std::cout << sender << ": " << message << std::endl;
     }
-    else if (msg.tag == "err") {
-      std::cerr << msg.data;
+    else if (msg.tag == "err") { // check if error msg receied
+      std::cerr << msg.data; // output error msg
     }
   }
 

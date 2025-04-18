@@ -36,17 +36,20 @@ int main(int argc, char **argv) {
   bool msg_sent = conn.send(msg);
   if (!msg_sent) {
     std::cerr << "Error: Failed to send rlogin message." << std::endl;
+    conn.close();
     return 1;
   }
 
   bool msg_received = conn.receive(msg);
   if (!msg_received) {
     std::cerr << "Error: No response for rlogin." << std::endl;
+    conn.close();
     return 1;
   }
 
   if (msg.tag == TAG_ERR) {
     std::cerr << msg.data << std::endl;
+    conn.close();
     exit( 1 );
   }
 
@@ -55,20 +58,21 @@ int main(int argc, char **argv) {
   msg_sent = conn.send(msg);
   if (!msg_sent) {
     std::cerr << "Error: Failed to send join message." << std::endl;
+    conn.close();
     return 1;
   }
 
-  msg_received = conn.receive(msg);
+  Message join_response;
+  msg_received = conn.receive(join_response);
   if (!msg_received) {
     std::cerr << "Error: No response for join." << std::endl;
+    conn.close();
     return 1;
   }
 
-  if (!msg.tag.empty() && msg.tag.back() == '\r') {
-    msg.tag.pop_back();
-  }
-  if (msg.tag == TAG_ERR) {
-    std::cerr << msg.data << std::endl;
+  if (join_response.tag == TAG_ERR) {
+    std::cerr << join_response.data << std::endl;
+    conn.close();
     exit( 1 );
   }
 
@@ -76,23 +80,33 @@ int main(int argc, char **argv) {
   //       (which should be tagged with TAG_DELIVERY)
 
   while (conn.receive(msg)) {
-    if (!msg.data.empty() && msg.data.back() == '\r') {
-      msg.data.pop_back();
-    }
     if (msg.tag == TAG_DELIVERY) {
-      size_t pos1 = msg.data.find(':');
-      if (pos1 == std::string::npos) { continue; } // Malformed message.
-      size_t pos2 = msg.data.find(':', pos1 + 1);
-      if (pos2 == std::string::npos) { continue; } // Malformed message.
+      size_t i = 0;
+      std::string room;
+      std::string sender;
+      std::string message;
 
-      std::string sender = msg.data.substr(pos1 + 1, pos2 - pos1 - 1);
-      std::string message = msg.data.substr(pos2 + 1);
+      while (msg.data[i] != ':') {
+        room += msg.data[i];
+        i++;
+      }
+      i++;
+
+      while (msg.data[i] != ':') {
+        sender += msg.data[i];
+        i++;
+      }
+      i++;
+
+      while (i < msg.data.size()) {
+        message += msg.data[i];
+        i++;
+      }
+
       std::cout << sender << ": " << message << std::endl;
     }
     else if (msg.tag == "err") {
-      std::string err = msg.data;
-      if (!err.empty() && err.back() == '\r') err.pop_back();
-      std::cerr << msg.data << std::endl;
+      std::cerr << msg.data;
     }
   }
 

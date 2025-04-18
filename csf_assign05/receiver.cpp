@@ -32,22 +32,24 @@ int main(int argc, char **argv) {
 
   // TODO: send rlogin and join messages (expect a response from
   //       the server for each one)
+
+  // receiver login
   Message msg(TAG_RLOGIN, username);
   bool msg_sent = conn.send(msg);
-  if (!msg_sent) {
+  if (!msg_sent) { // check that login request sent
     std::cerr << "Error: Failed to send rlogin message." << std::endl;
     conn.close();
     return 1;
   }
 
   bool msg_received = conn.receive(msg);
-  if (!msg_received) {
+  if (!msg_received) { // check that login response was received
     std::cerr << "Error: No response for rlogin." << std::endl;
     conn.close();
     return 1;
   }
 
-  if (msg.tag == TAG_ERR) {
+  if (msg.tag == TAG_ERR) { // check for error resonse
     std::cerr << msg.data << std::endl;
     conn.close();
     exit( 1 );
@@ -70,7 +72,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (join_response.tag == TAG_ERR) {
+  if (join_response.tag == TAG_ERR) { // check for error response
     std::cerr << join_response.data << std::endl;
     conn.close();
     exit( 1 );

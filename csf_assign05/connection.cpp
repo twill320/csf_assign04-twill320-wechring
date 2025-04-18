@@ -22,18 +22,20 @@ Connection::Connection(int fd)
 void Connection::connect(const std::string &hostname, int port) {
   // TODO: call open_clientfd to connect to the server
   // TODO: call rio_readinitb to initialize the rio_t object
-  char usable_hostname[hostname.length()];
+  char usable_hostname[hostname.length()+1];
   strcpy(usable_hostname, hostname.c_str());
 
   std::string str = std::to_string(port);
   const char* char_port = str.c_str();
   m_fd = open_clientfd(usable_hostname, char_port);
-  rio_readinitb(&m_fdbuf, port);
+  rio_readinitb(&m_fdbuf, m_fd);
 }
 
 Connection::~Connection() {
   // TODO: close the socket if it is open
-  Close(m_fd);
+  if (m_fd > 0) {
+    ::close(m_fd);
+  }
 }
 
 bool Connection::is_open() const {
@@ -47,7 +49,7 @@ bool Connection::is_open() const {
 void Connection::close() {
   // TODO: close the connection if it is open
   if (m_fd > 0) {
-    Close(m_fd);
+    ::close(m_fd);
   }
 }
 
@@ -83,24 +85,24 @@ bool Connection::receive(Message &msg) {
   // read message from server
   std::string tag;
   std::string data;
-  rio_readinitb(&m_fdbuf, m_fd);
-  char buf[msg.MAX_LEN];
+  //rio_readinitb(&m_fdbuf, m_fd);
+  char buf[Message::MAX_LEN + 2];
   ssize_t n = rio_readlineb(&m_fdbuf, buf, sizeof(buf));
 
   // msg length greater than max length
-  if (n > msg.MAX_LEN) {
+  if (n > Message::MAX_LEN) {
     m_last_result = INVALID_MSG;
     return false;
   }
 
   size_t i = 0;
-  while (buf[i] != ':' && i < sizeof(buf)) {
+  while (i < sizeof(buf) && buf[i] != ':') {
     tag += buf[i];
     i++;
   }
   i++;
 
-  while (buf[i] != '\r' && buf[i] != '\n' && i < sizeof(buf)) {
+  while (i < sizeof(buf) && buf[i] != '\r' && buf[i] != '\n') {
     data += buf[i];
     i++;
   }

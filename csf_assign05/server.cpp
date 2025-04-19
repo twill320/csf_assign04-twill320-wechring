@@ -29,15 +29,14 @@ void chat_with_receiver(Connection &conn, const std::string username) {
   Message msg;
   User user(username);
   conn.receive(msg);
-  if (msg.tag == TAG_JOIN) {
-    Room room(msg.data);
-    room.add_member(&user);
-    msg.tag = TAG_OK;
-    msg.data = "Join successful";
-    conn.send(msg);
-  } else { // want to handle case where server does not receive join message from client
+  if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
     exit( 1 );
   }
+  Room room(msg.data);
+  room.add_member(&user);
+  msg.tag = TAG_OK;
+  msg.data = "Join successful";
+  conn.send(msg);
 
   while (conn.receive(msg)) {
     // wait for another message sent into the room (from senders)
@@ -76,23 +75,22 @@ void chat_with_sender(Connection &conn, const std::string username) {
   Message msg;
   User user(username);
   conn.receive(msg);
-  if (msg.tag == TAG_JOIN) {
-    Room room(msg.data);
-    room.add_member(&user);
-    msg.tag = TAG_OK;
-    msg.data = "Join successful";
-    conn.send(msg);
-  } else { // want to handle case where server does not receive join message from client
+  if (msg.tag == TAG_JOIN) { // want to handle case where server does not receive join message from client
     exit( 1 );
   }
+  Room room(msg.data);
+  room.add_member(&user);
+  msg.tag = TAG_OK;
+  msg.data = "Join successful";
+  conn.send(msg);
 
+  // need to compare return value to size of message transmitted
   while (conn.receive(msg)) {
     if (msg.tag == "sendall") {
-      // need to figure out how to broadcast to all receivers in this room
+      room.broadcast_message(username, msg.data);
       conn.send(Message("ok","sent")); 
     } else if (msg.tag == "leave") {
-      // need to figure out how to remove from room, send back ok
-
+      room.remove_member(&user);
       conn.send(Message("ok","left"));
     } else if (msg.tag == "quit") { // need to figure out what to do on quit
       break;

@@ -39,13 +39,15 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
     msg.data = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
-    exit( 1 ); // not sure if this is correct to do, thinking it should be handled by receiver
   }
   Room *room = server.find_or_create_room(msg.data);
   room->add_member(&user);
   msg.tag = TAG_OK;
   msg.data = "Join successful";
   conn.send(msg);
+
+  // need to go through message queue to see what messages to be sent to receiver from sender
+  // probably check room to see what other users are in room and check messageque for each and send messages to receiver
 
   while (conn.receive(msg)) { // if this is received message from receiver this might be wrong
     // wait for another message sent into the room (from senders)
@@ -88,7 +90,6 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
     msg.data = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
-    exit( 1 );
   }
   Room *room = server.find_or_create_room(msg.data);
   room->add_member(&user);
@@ -99,7 +100,7 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
   // need to compare return value to size of message transmitted
   while (conn.receive(msg)) {
     if (msg.tag == "sendall") {
-      room->broadcast_message(username, msg.data);
+      room->broadcast_message(username, msg.data); // may need to use broadcast_message to update message queue for all other users
       conn.send(Message("ok","sent")); 
     } else if (msg.tag == "leave") {
       room->remove_member(&user);
@@ -108,7 +109,8 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
       break;
     } else {
       msg.tag = TAG_ERR;
-      msg.data = "Error: invalid "
+      msg.data = "Error: invalid command given";
+      conn.send(msg);
     }
   }
 }

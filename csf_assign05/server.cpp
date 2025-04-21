@@ -20,25 +20,34 @@
 // TODO: add any additional data types that might be helpful
 //       for implementing the Server member functions
 
+struct ConnInfo {
+  int client_fd;
+  Server *server;
+};
+
 ////////////////////////////////////////////////////////////////////////
 // Client thread functions
 ////////////////////////////////////////////////////////////////////////
 
 namespace {
-void chat_with_receiver(Connection &conn, const std::string username) {
+
+void chat_with_receiver(Server &server, Connection &conn, const std::string username) {
   Message msg;
   User user(username);
   conn.receive(msg);
   if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
-    exit( 1 );
+    msg.data = TAG_ERR;
+    msg.data = "Error: Did not receive join request.";
+    conn.send(msg);
+    exit( 1 ); // not sure if this is correct to do, thinking it should be handled by receiver
   }
-  Room room(msg.data);
-  room.add_member(&user);
+  Room *room = server.find_or_create_room(msg.data);
+  room->add_member(&user);
   msg.tag = TAG_OK;
   msg.data = "Join successful";
   conn.send(msg);
 
-  while (conn.receive(msg)) {
+  while (conn.receive(msg)) { // if this is received message from receiver this might be wrong
     // wait for another message sent into the room (from senders)
     // figure out message delivery
     size_t i = 0;
@@ -71,15 +80,18 @@ void chat_with_receiver(Connection &conn, const std::string username) {
   }
 }
 
-void chat_with_sender(Connection &conn, const std::string username) {
+void chat_with_sender(Server &server, Connection &conn, const std::string username) {
   Message msg;
   User user(username);
   conn.receive(msg);
-  if (msg.tag == TAG_JOIN) { // want to handle case where server does not receive join message from client
+  if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
+    msg.data = TAG_ERR;
+    msg.data = "Error: Did not receive join request.";
+    conn.send(msg);
     exit( 1 );
   }
-  Room room(msg.data);
-  room.add_member(&user);
+  Room *room = server.find_or_create_room(msg.data);
+  room->add_member(&user);
   msg.tag = TAG_OK;
   msg.data = "Join successful";
   conn.send(msg);
@@ -87,13 +99,16 @@ void chat_with_sender(Connection &conn, const std::string username) {
   // need to compare return value to size of message transmitted
   while (conn.receive(msg)) {
     if (msg.tag == "sendall") {
-      room.broadcast_message(username, msg.data);
+      room->broadcast_message(username, msg.data);
       conn.send(Message("ok","sent")); 
     } else if (msg.tag == "leave") {
-      room.remove_member(&user);
+      room->remove_member(&user);
       conn.send(Message("ok","left"));
     } else if (msg.tag == "quit") { // need to figure out what to do on quit
       break;
+    } else {
+      msg.tag = TAG_ERR;
+      msg.data = "Error: invalid "
     }
   }
 }
@@ -104,7 +119,10 @@ void *worker(void *arg) {
   // TODO: use a static cast to convert arg from a void* to
   //       whatever pointer type describes the object(s) needed
   //       to communicate with a client (sender or receiver)
-  int client_fd = static_cast<int>(reinterpret_cast<intptr_t>(arg));
+  ConnInfo *conn_info = static_cast<ConnInfo*>(arg);
+
+  int client_fd = conn_info->client_fd;
+  Server *server = conn_info->server;
 
   // build Connection
   Connection conn(client_fd);
@@ -141,9 +159,9 @@ void *worker(void *arg) {
   //       separate helper functions for each of these possibilities
   //       is a good idea)
   if (client == "receiver") {
-    chat_with_receiver(conn, username);
+    chat_with_receiver(*server, conn, username);
   } else if (client == "sender") {
-    chat_with_sender(conn, username);
+    chat_with_sender(*server, conn, username);
   }
 
   return nullptr;
@@ -184,7 +202,9 @@ void Server::handle_client_requests() {
   //       pthread for each connected client
   while (true) {
     int client_fd = ::accept(m_ssock, nullptr, nullptr);
-    void *arg = reinterpret_cast<void*>(static_cast<intptr_t>(client_fd));
+    struct ConnInfo conn_info = {client_fd, this};
+    struct ConnInfo *arg;
+    arg = &conn_info;
     pthread_t tid;
 
     ::pthread_create(&tid, nullptr, worker, arg);
@@ -199,7 +219,8 @@ Room *Server::find_or_create_room(const std::string &room_name) { // figure out
     return it->second;
   }
 
-  Room temp_room(room_name);
-  Room *room = &temp_room;
+  struct Room temp_room = {room_name};
+  struct Room *room;
+  room = &temp_room;
   return room;
 }

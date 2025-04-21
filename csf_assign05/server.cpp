@@ -49,7 +49,9 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
   // need to go through message queue to see what messages to be sent to receiver from sender
   // probably check room to see what other users are in room and check messageque for each and send messages to receiver
 
-  while (conn.receive(msg)) { // if this is received message from receiver this might be wrong
+  // implemntation of traversing messagequeue
+
+  /*while (conn.receive(msg)) { // if this is received message from receiver this might be wrong
     // wait for another message sent into the room (from senders)
     // figure out message delivery
     size_t i = 0;
@@ -79,7 +81,7 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
 
     Message out("delivery", room + ":" + sender + ":" + message);
     conn.send(out);
-  }
+  } */
 }
 
 void chat_with_sender(Server &server, Connection &conn, const std::string username) {
@@ -154,6 +156,10 @@ void *worker(void *arg) {
     msg.data = "Login successful";
     conn.send(msg);
     client = "sender";
+  } else {
+    msg.data = TAG_ERR;
+    msg.data = "Error: Did not receive login request";
+    conn.send(msg);
   }
 
   // TODO: depending on whether the client logged in as a sender or

@@ -17,16 +17,19 @@ Room::~Room() {
 
 void Room::add_member(User *user) {
   // TODO: add User to the room
+  Guard g(lock);
   members.insert(user);
 }
 
 void Room::remove_member(User *user) {
   // TODO: remove User from the room
+  Guard g(lock);
   members.erase(user);
 }
 
 void Room::broadcast_message(const std::string &sender_username, const std::string &message_text) {
   // TODO: send a message to every (receiver) User in the room
+  Guard g(lock);
   for (std::set<User *>::iterator it = members.begin(); it != members.end(); ++it) {
     User *user = *it;
     if (user->username == sender_username){

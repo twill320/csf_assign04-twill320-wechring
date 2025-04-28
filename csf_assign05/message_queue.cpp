@@ -15,6 +15,7 @@ void MessageQueue::enqueue(Message *msg) {
 
   // be sure to notify any thread waiting for a message to be
   // available by calling sem_post
+
 }
 
 Message *MessageQueue::dequeue() {
@@ -33,6 +34,7 @@ Message *MessageQueue::dequeue() {
   //       to be available, return nullptr if no message is available
 
   // TODO: remove the next message from the queue, return it
+  delete this; // used dynamically allocated input to enqueue in room.cpp, need to delete at some point in dequeue after value is used
   Message *msg = nullptr;
   return msg;
 }

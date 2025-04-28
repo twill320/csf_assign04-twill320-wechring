@@ -95,6 +95,10 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
       delete user;
       conn.close();
       exit( 1 );
+    } else {
+      msg.tag = TAG_ERR;
+      msg.data = "Error: Invalid message";
+      conn.send(msg);
     }
   }
 }

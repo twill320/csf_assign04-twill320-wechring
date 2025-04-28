@@ -33,43 +33,49 @@ namespace {
 
 void chat_with_receiver(Server &server, Connection &conn, const std::string username) {
   Message msg;
-  User user(username);
+  User *user = new User(username);
   conn.receive(msg);
   if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
     msg.data = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
+    delete user;
+    exit( 1 );
   }
   Room *room = server.find_or_create_room(msg.data);
-  room->add_member(&user);
+  room->add_member(user);
   msg.tag = TAG_OK;
   msg.data = "Join successful";
   conn.send(msg);
 
   // retrieve new messsasges form server while connection is open and message queue is non-empty
-  MessageQueue &mqueue = user.mqueue;
+  MessageQueue &userqueue = user->mqueue;
+  Message *new_msg;
   while (conn.is_open()) {
-    Message *new_msg = mqueue.dequeue();
+    new_msg = userqueue.dequeue();
     if (new_msg == nullptr) {
-      continue; // not sure if should be break or continue
+      break; // not sure if should be break or continue
     }
     conn.send(*new_msg);
-    new_msg = mqueue.dequeue();
+    delete new_msg;
   }
-  room->remove_member(&user);
+  room->remove_member(user);
+  delete user;
 }
 
 void chat_with_sender(Server &server, Connection &conn, const std::string username) {
   Message msg;
-  User user(username);
+  User *user = new User(username);
   conn.receive(msg);
   if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
     msg.data = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
+    delete user;
+    exit( 1 );
   }
   Room *room = server.find_or_create_room(msg.data);
-  room->add_member(&user);
+  room->add_member(user);
   msg.tag = TAG_OK;
   msg.data = "Join successful";
   conn.send(msg);
@@ -80,14 +86,15 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
       room->broadcast_message(username, msg.data); // may need to use broadcast_message to update message queue for all other users
       conn.send(Message("ok","sent")); 
     } else if (msg.tag == "leave") {
-      room->remove_member(&user);
+      room->remove_member(user);
+      delete user;
       conn.send(Message("ok","left"));
     } else if (msg.tag == "quit") { // need to figure out what to do on quit
-      break;
-    } else {
-      msg.tag = TAG_ERR;
-      msg.data = "Error: invalid command given";
+      msg.data = TAG_OK;
       conn.send(msg);
+      delete user;
+      conn.close();
+      exit( 1 );
     }
   }
 }
@@ -167,6 +174,14 @@ Server::Server(int port)
 
 Server::~Server() {
   // TODO: destroy mutex
+  for (std::map<std::string,Room*>::iterator it = m_rooms.begin();
+    it != m_rooms.end();
+    ++it)
+  {
+    delete it->second;
+  }
+  m_rooms.clear();
+
   ::pthread_mutex_destroy(&m_lock);
 }
 
@@ -177,6 +192,7 @@ bool Server::listen() {
   const char* char_port = str.c_str();
   int create_success = open_listenfd(char_port);
   if (create_success > 0) {
+    m_ssock = create_success;
     return true;
   }
 
@@ -201,13 +217,14 @@ void Server::handle_client_requests() {
 Room *Server::find_or_create_room(const std::string &room_name) { // figure out
   // TODO: return a pointer to the unique Room object representing
   //       the named chat room, creating a new one if necessary
+  Guard lock_guard(m_lock);
+
   std::map<std::string, Room *>::iterator it = m_rooms.find(room_name);
   if (it != m_rooms.end()) {
     return it->second;
   }
 
-  struct Room temp_room = {room_name};
-  struct Room *room;
-  room = &temp_room;
+  struct Room *room = new Room(room_name);
+  m_rooms[room_name] = room;
   return room;
 }

@@ -51,11 +51,12 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
   while (conn.is_open()) {
     Message *new_msg = mqueue.dequeue();
     if (new_msg == nullptr) {
-      break;
+      continue; // not sure if should be break or continue
     }
     conn.send(*new_msg);
     new_msg = mqueue.dequeue();
   }
+  room->remove_member(&user);
 }
 
 void chat_with_sender(Server &server, Connection &conn, const std::string username) {
@@ -101,6 +102,7 @@ void *worker(void *arg) {
 
   int client_fd = conn_info->client_fd;
   Server *server = conn_info->server;
+  delete conn_info;
 
   // build Connection
   Connection conn(client_fd);
@@ -145,6 +147,7 @@ void *worker(void *arg) {
   } else if (client == "sender") {
     chat_with_sender(*server, conn, username);
   }
+  conn.close();
 
   return nullptr;
 }
@@ -159,11 +162,12 @@ Server::Server(int port)
   : m_port(port)
   , m_ssock(-1) {
   // TODO: initialize mutex
-
+  ::pthread_mutex_init(&m_lock, NULL);
 }
 
 Server::~Server() {
   // TODO: destroy mutex
+  ::pthread_mutex_destroy(&m_lock);
 }
 
 bool Server::listen() {
@@ -184,12 +188,13 @@ void Server::handle_client_requests() {
   //       pthread for each connected client
   while (true) {
     int client_fd = ::accept(m_ssock, nullptr, nullptr);
-    struct ConnInfo conn_info = {client_fd, this};
-    struct ConnInfo *arg;
-    arg = &conn_info;
+    struct ConnInfo *conn_info = new ConnInfo{ client_fd, this };
     pthread_t tid;
 
-    ::pthread_create(&tid, nullptr, worker, arg);
+    if (::pthread_create(&tid, NULL, worker, conn_info) != 0) {
+      std::cerr << "pthread_create failed" << std::endl;
+      exit(1);
+    }
   }
 }
 

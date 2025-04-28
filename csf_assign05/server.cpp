@@ -46,42 +46,16 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
   msg.data = "Join successful";
   conn.send(msg);
 
-  // need to go through message queue to see what messages to be sent to receiver from sender
-  // probably check room to see what other users are in room and check messageque for each and send messages to receiver
-
-  // implemntation of traversing messagequeue
-
-  /*while (conn.receive(msg)) { // if this is received message from receiver this might be wrong
-    // wait for another message sent into the room (from senders)
-    // figure out message delivery
-    size_t i = 0;
-    std::string room;
-    std::string sender;
-    std::string message;
-
-    // loop through received msg data to get room
-    while (msg.data[i] != ':') {
-      room += msg.data[i];
-      i++;
+  // retrieve new messsasges form server while connection is open and message queue is non-empty
+  MessageQueue &mqueue = user.mqueue;
+  while (conn.is_open()) {
+    Message *new_msg = mqueue.dequeue();
+    if (new_msg == nullptr) {
+      break;
     }
-    i++;
-
-    // loop through received msg data to get sender
-    while (msg.data[i] != ':') {
-      sender += msg.data[i];
-      i++;
-    }
-    i++;
-
-    // loop through received msg data to get actual message
-    while (i < msg.data.size()) {
-      message += msg.data[i];
-      i++;
-    }
-
-    Message out("delivery", room + ":" + sender + ":" + message);
-    conn.send(out);
-  } */
+    conn.send(*new_msg);
+    new_msg = mqueue.dequeue();
+  }
 }
 
 void chat_with_sender(Server &server, Connection &conn, const std::string username) {

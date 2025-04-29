@@ -4,10 +4,8 @@
 
 MessageQueue::MessageQueue() {
   // TODO: initialize the mutex and the semaphore
-  ::pthread_mutex_lock(&m_lock);
-  ::pthread_mutex_unlock(&m_lock);
-  ::pthread_mutex_init(&m_lock, NULL);
-  ::sem_init(&m_avail, 0, 0);
+::pthread_mutex_init(&m_lock, NULL);
+::sem_init(&m_avail, 0, 0);
 }
 
 MessageQueue::~MessageQueue() {

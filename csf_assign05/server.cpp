@@ -67,34 +67,31 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
   Message msg;
   User *user = new User(username);
   conn.receive(msg);
-  if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
-    msg.data = TAG_ERR;
-    msg.data = "Error: Did not receive join request.";
-    conn.send(msg);
-    delete user;
-    exit( 1 );
-  }
-  Room *room = server.find_or_create_room(msg.data);
-  room->add_member(user);
-  msg.tag = TAG_OK;
-  msg.data = "Join successful";
-  conn.send(msg);
+  Room *room;
 
   // need to compare return value to size of message transmitted
   while (conn.receive(msg)) {
-    if (msg.tag == "sendall") {
-      room->broadcast_message(username, msg.data); // may need to use broadcast_message to update message queue for all other users
-      conn.send(Message("ok","sent")); 
-    } else if (msg.tag == "leave") {
-      room->remove_member(user);
-      delete user;
-      conn.send(Message("ok","left"));
-    } else if (msg.tag == "quit") { // need to figure out what to do on quit
-      msg.data = TAG_OK;
+    if (msg.tag == TAG_JOIN) {
+      room = server.find_or_create_room(msg.data);
+      room->add_member(user);
+      msg.tag = TAG_OK;
+      msg.data = "Join successful";
+      conn.send(msg);
+      continue;
+    } else if (msg.tag == TAG_QUIT) {
+      msg.tag = TAG_OK;
       conn.send(msg);
       delete user;
       conn.close();
       exit( 1 );
+    }
+    if (msg.tag == "sendall") {
+      room->broadcast_message(username, msg.data); // may need to use broadcast_message to update message queue for all other users
+      conn.send(Message("ok","sent")); 
+    } else if (msg.tag == TAG_LEAVE) {
+      room->remove_member(user);
+      delete user;
+      conn.send(Message("ok","left"));
     } else {
       msg.tag = TAG_ERR;
       msg.data = "Error: Invalid message";

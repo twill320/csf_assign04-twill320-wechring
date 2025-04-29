@@ -35,7 +35,8 @@ void Room::broadcast_message(const std::string &sender_username, const std::stri
     if (user->username == sender_username){
       continue;
     }
-    struct Message *msg = new Message{ TAG_DELIVERY, message_text };
+    std::string payload = room_name + ":" + sender_username + ":" + message_text;
+    struct Message *msg = new Message{ TAG_DELIVERY, payload };
     user->mqueue.enqueue(msg);
   }
 }

@@ -67,9 +67,6 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
   User   *user = new User(username);
   Room   *current_room = nullptr;
 
-  // You can either do this before the loop, or let the loop's JOIN case handle it.
-  // Here we'll handle it in the loop itself.
-
   while (conn.receive(msg)) {
     if (msg.tag == TAG_JOIN) {
       // 1) If they were in a room, leave it
@@ -77,36 +74,48 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
         current_room->remove_member(user);
       }
 
-      // 2) Find or create the new room, join it
       current_room = server.find_or_create_room(msg.data);
       current_room->add_member(user);
 
-      // 3) Acknowledge
-      conn.send({ TAG_OK, "Joined room " + msg.data });
+      msg.tag = TAG_OK;
+      msg.data = "Joined Room.";
+      conn.send(msg);
     
     } else if (msg.tag == TAG_SENDALL) {
       if (!current_room) {
-        conn.send({ TAG_ERR, "Not in a room; JOIN first." });
+        msg.tag = TAG_ERR;
+        msg.data = "Error: Not in a room. JOIN first.";
+        conn.send(msg);
       } else {
         current_room->broadcast_message(username, msg.data);
-        conn.send({ TAG_OK, "Message sent" });
+        msg.tag = TAG_OK;
+        msg.data = "Message sent.";
+        conn.send(msg);
       }
 
     } else if (msg.tag == TAG_LEAVE) {
       if (current_room) {
       current_room->remove_member(user);
       current_room = nullptr;
-      conn.send({ TAG_OK, "Left current room"});
-    } else {
-      conn.send({ TAG_ERR, "Not in a room" });
-    }
+      msg.tag = TAG_OK;
+      msg.data = "Left current rooom.";
+      conn.send(msg);
+      } else {
+        msg.tag = TAG_ERR;
+        msg.data = "Error: Not in a room.";
+        conn.send(msg);
+      }
 
     } else if (msg.tag == TAG_QUIT) {
-      conn.send({ TAG_OK, "Goodbye" });
+      msg.tag = TAG_OK;
+      msg.data = "Quiting...";
+      conn.send(msg);
       break;   // exit the loop
 
     } else {
-      conn.send({ TAG_ERR, "Unknown command: " + msg.tag });
+      msg.tag = TAG_ERR;
+      msg.data = "Error: Invalid command.";
+      conn.send(msg);
   }
   }
 
@@ -128,6 +137,7 @@ void *worker(void *arg) {
   int client_fd = conn_info->client_fd;
   Server *server = conn_info->server;
   delete conn_info;
+  std::string username;
 
   // build Connection
   Connection conn(client_fd);
@@ -201,7 +211,11 @@ bool Server::listen() {
   std::string str = std::to_string(m_port);
   const char* char_port = str.c_str();
   int create_success = open_listenfd(char_port);
-  return (create_success >= 0);
+  if (create_success > 0) {
+    m_ssock = create_success;
+    return true;
+  }
+  return false;
 }
 
 void Server::handle_client_requests() {

@@ -65,39 +65,51 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
 
 void chat_with_sender(Server &server, Connection &conn, const std::string username) {
   Message msg;
-  User *user = new User(username);
-  conn.receive(msg);
-  Room *room;
 
-  // need to compare return value to size of message transmitted
-  while (conn.receive(msg)) {
-    if (msg.tag == TAG_JOIN) {
-      room = server.find_or_create_room(msg.data);
-      room->add_member(user);
-      msg.tag = TAG_OK;
-      msg.data = "Join successful";
-      conn.send(msg);
-      continue;
-    } else if (msg.tag == TAG_QUIT) {
-      msg.tag = TAG_OK;
-      conn.send(msg);
-      delete user;
-      conn.close();
-      exit( 1 );
+    // 1) Expect a JOIN as the very first message
+    if (!conn.receive(msg) || msg.tag != TAG_JOIN) {
+        conn.send({ TAG_ERR, "Expected JOIN as first message" });
+        return;  // abort session
     }
-    if (msg.tag == "sendall") {
-      room->broadcast_message(username, msg.data); // may need to use broadcast_message to update message queue for all other users
-      conn.send(Message("ok","sent")); 
-    } else if (msg.tag == TAG_LEAVE) {
-      room->remove_member(user);
-      delete user;
-      conn.send(Message("ok","left"));
-    } else {
-      msg.tag = TAG_ERR;
-      msg.data = "Error: Invalid message";
-      conn.send(msg);
+
+    // 2) Find or create the room, register the user
+    Room *room = server.find_or_create_room(msg.data);
+    User *user = new User(username);
+    room->add_member(user);
+
+    // 3) Acknowledge the join
+    conn.send({ TAG_OK, "Join successful" });
+
+    // 4) Command loop: sendall, leave, quit
+    while (conn.receive(msg)) {
+      if (msg.tag == TAG_SENDALL) {
+        // broadcast and ack
+        room->broadcast_message(username, msg.data);
+        conn.send({ TAG_OK, "Message sent" });
+
+      } else if (msg.tag == TAG_LEAVE) {
+        // leave the room, ack, then end this chat function
+        room->remove_member(user);
+        conn.send({ TAG_OK, "Left room" });
+        delete user;
+        return;
+
+      } else if (msg.tag == TAG_QUIT) {
+        // client is done, ack, then end
+        conn.send({ TAG_OK, "Goodbye" });
+        room->remove_member(user);
+        delete user;
+        return;
+
+      } else {
+        // anything else is an error
+        conn.send({ TAG_ERR, "Unknown command: " + msg.tag });
+      }
     }
-  }
+
+    // If receive() returned false (socket closed / error), do cleanup
+    room->remove_member(user);
+    delete user;
 }
 
 void *worker(void *arg) {

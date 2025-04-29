@@ -34,7 +34,7 @@ namespace {
 void chat_with_receiver(Server &server, Connection &conn, const std::string username) {
   Message msg;
   User *user = new User(username);
-  if (!conn.receive(msg) || msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
+  if (!conn.receive(msg) || msg.tag != TAG_JOIN) { // handle case where server does not receive join message from client
     msg.tag = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
@@ -69,7 +69,7 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
 
   while (conn.receive(msg)) {
     if (msg.tag == TAG_JOIN) {
-      // 1) If they were in a room, leave it
+      // leave room user is currently in
       if (current_room) {
         current_room->remove_member(user);
       }
@@ -79,7 +79,9 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
 
       msg.tag = TAG_OK;
       msg.data = "Joined Room.";
-      conn.send(msg);
+      if (!conn.send(msg)) {
+        break;
+      }
     
     } else if (msg.tag == TAG_SENDALL) {
       if (!current_room) {
@@ -90,7 +92,9 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
         current_room->broadcast_message(username, msg.data);
         msg.tag = TAG_OK;
         msg.data = "Message sent.";
-        conn.send(msg);
+        if (!conn.send(msg)) {
+          break;
+        }
       }
 
     } else if (msg.tag == TAG_LEAVE) {
@@ -103,20 +107,32 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
       } else {
         msg.tag = TAG_ERR;
         msg.data = "Error: Not in a room.";
-        conn.send(msg);
+        if (!conn.send(msg)) {
+          break;
+        }
       }
 
     } else if (msg.tag == TAG_QUIT) {
       msg.tag = TAG_OK;
       msg.data = "Quiting...";
-      conn.send(msg);
+      if (!conn.send(msg)) {
+        break;
+      }
       break;   // exit the loop
 
     } else {
       msg.tag = TAG_ERR;
       msg.data = "Error: Invalid command.";
-      conn.send(msg);
+      if (!conn.send(msg)) {
+        break;
+      }
+    }
   }
+  // check for message length in connecttion.cpp
+  if (conn.m_last_result == INVALID_MSG) {
+    msg.tag = TAG_ERR;
+    msg.data = "Message is too long.";
+    conn.send(msg);
   }
 
   // cleanup

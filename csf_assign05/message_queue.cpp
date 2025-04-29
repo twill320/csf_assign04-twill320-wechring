@@ -1,6 +1,7 @@
 #include <cassert>
 #include <ctime>
 #include "message_queue.h"
+#include "message.h"
 
 MessageQueue::MessageQueue() {
   // TODO: initialize the mutex and the semaphore
@@ -10,8 +11,14 @@ MessageQueue::MessageQueue() {
 
 MessageQueue::~MessageQueue() {
   // TODO: destroy the mutex and the semaphore
-  ::pthread_mutex_lock(&m_lock);
-  ::pthread_mutex_unlock(&m_lock);
+
+  pthread_mutex_lock(&m_lock);
+  while (!m_messages.empty()) {
+    delete m_messages.front();
+    m_messages.pop_front();
+  }
+  pthread_mutex_unlock(&m_lock);
+  
   ::sem_post(&m_avail);
   ::sem_destroy(&m_avail);
 

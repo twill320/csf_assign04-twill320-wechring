@@ -36,7 +36,7 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
   User *user = new User(username);
   conn.receive(msg);
   if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
-    msg.data = TAG_ERR;
+    msg.tag = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
     delete user;

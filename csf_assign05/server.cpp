@@ -34,13 +34,12 @@ namespace {
 void chat_with_receiver(Server &server, Connection &conn, const std::string username) {
   Message msg;
   User *user = new User(username);
-  conn.receive(msg);
-  if (msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
+  if (!conn.receive(msg) || msg.tag != TAG_JOIN) { // want to handle case where server does not receive join message from client
     msg.tag = TAG_ERR;
     msg.data = "Error: Did not receive join request.";
     conn.send(msg);
     delete user;
-    exit( 1 );
+    return;
   }
   Room *room = server.find_or_create_room(msg.data);
   room->add_member(user);
@@ -54,7 +53,7 @@ void chat_with_receiver(Server &server, Connection &conn, const std::string user
   while (conn.is_open()) {
     new_msg = userqueue.dequeue();
     if (new_msg == nullptr) {
-      break; // not sure if should be break or continue
+      continue;
     }
     conn.send(*new_msg);
     delete new_msg;
@@ -96,8 +95,8 @@ void chat_with_sender(Server &server, Connection &conn, const std::string userna
     } else if (msg.tag == TAG_LEAVE) {
       if (current_room) {
       current_room->remove_member(user);
-      conn.send({ TAG_OK, "Left current room"});
       current_room = nullptr;
+      conn.send({ TAG_OK, "Left current room"});
     } else {
       conn.send({ TAG_ERR, "Not in a room" });
     }
@@ -144,37 +143,29 @@ void *worker(void *arg) {
     return nullptr;
   }
 
-  std::string client;
-  std::string username;
-  if (msg.tag == TAG_RLOGIN) {
-    username = msg.data;
-    msg.tag = TAG_OK;
-    msg.data = "Login successful";
-    conn.send(msg);
-    client = "receiver";
-  } else if (msg.tag == TAG_SLOGIN) {
-    username = msg.data;
-    msg.tag = TAG_OK;
-    msg.data = "Login successful";
-    conn.send(msg);
-    client = "sender";
-  } else {
-    msg.data = TAG_ERR;
-    msg.data = "Error: Did not receive login request";
-    conn.send(msg);
-  }
-
-  // TODO: depending on whether the client logged in as a sender or
+    // TODO: depending on whether the client logged in as a sender or
   //       receiver, communicate with the client (implementing
   //       separate helper functions for each of these possibilities
   //       is a good idea)
-  if (client == "receiver") {
-    chat_with_receiver(*server, conn, username);
-  } else if (client == "sender") {
-    chat_with_sender(*server, conn, username);
-  }
-  conn.close();
+  
+  if (msg.tag == TAG_RLOGIN) {
+  username = msg.data;
+  msg.tag = TAG_OK;
+  msg.data = "Login successful";
+  conn.send(msg);
+  chat_with_receiver(*server, conn, username);
+} else if (msg.tag == TAG_SLOGIN) {
+  username = msg.data;
+  msg.tag = TAG_OK;
+  msg.data = "Login successful";
+  conn.send(msg);
+  chat_with_sender(*server, conn, username);
+} else {
+  msg.data = "Error: Did not receive login request";
+  conn.send(msg);
+}
 
+  conn.close();
   return nullptr;
 }
 
@@ -210,12 +201,7 @@ bool Server::listen() {
   std::string str = std::to_string(m_port);
   const char* char_port = str.c_str();
   int create_success = open_listenfd(char_port);
-  if (create_success > 0) {
-    m_ssock = create_success;
-    return true;
-  }
-
-  return false;
+  return (create_success >= 0);
 }
 
 void Server::handle_client_requests() {
